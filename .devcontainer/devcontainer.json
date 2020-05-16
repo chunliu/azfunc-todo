@@ -1,0 +1,10 @@
+{
+    "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-azuretools.vscode-azurefunctions",
+    ],
+    "settings": {
+        "terminal.integrated.shell.linux": "/bin/zsh",
+        "terminal.integrated.fontFamily": "Delugia Nerd Font Book",
+    }
+}
