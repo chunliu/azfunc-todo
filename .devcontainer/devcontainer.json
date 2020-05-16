@@ -6,5 +6,6 @@
     "settings": {
         "terminal.integrated.shell.linux": "/bin/zsh",
         "terminal.integrated.fontFamily": "Delugia Nerd Font Book",
-    }
+    },
+    "forwardPorts": [7071]
 }
