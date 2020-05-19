@@ -1,7 +1,9 @@
 name: Deploy
 
 on:
-  label: Release
+  push:
+    branches: 
+    - release
 
 env:
   NETCORE_VERSION: 3.1.101
