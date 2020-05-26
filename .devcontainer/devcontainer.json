@@ -2,6 +2,8 @@
     "extensions": [
         "ms-dotnettools.csharp",
         "ms-azuretools.vscode-azurefunctions",
+        "msazurermtools.azurerm-vscode-tools",
+        "bencoleman.armview",
     ],
     "settings": {
         "terminal.integrated.shell.linux": "/bin/zsh",
