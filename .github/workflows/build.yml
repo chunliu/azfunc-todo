@@ -23,7 +23,12 @@ jobs:
       with:
         dotnet-version: ${{ env.NETCORE_VERSION }}
 
-    - name: Install dependencies
-      run: dotnet restore
     - name: Build
-      run: dotnet build --configuration Release --no-restore
+      run: dotnet build --configuration Release --output ./output
+    
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: drop
+        # A file, directory or wildcard pattern that describes what to upload
+        path: ./output
