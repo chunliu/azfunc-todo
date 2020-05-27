@@ -1,0 +1,298 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "sqlServerName": {
+            "type": "string",
+            "metadata": {
+                "description": "The name of the sql server instance"
+            }
+        },
+        "sqlAdmin": {
+            "type": "string",
+            "metadata": {
+                "description": "The name of the administrator login"
+            }
+        },
+        "sqlAdminPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "The password of the administrator login"
+            }
+        },
+        "functionAppName": {
+            "type": "string",
+            "metadata": {
+                "description": "The name of the function app"
+            }
+        }
+    },
+    "functions": [],
+    "variables": {
+        "vnetName": "[concat(resourceGroup().name, '-vnet')]",
+        "appServicePlanName": "[concat(parameters('functionAppName'), '-svcplan')]",
+        "funcAppStorage": "[concat(parameters('functionAppName'), 'storage')]",
+        "appInsightName": "[concat(resourceGroup().name, '-appinsights')]"
+    },
+    "resources": [
+        {
+            "name": "[variables('vnetName')]",
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2019-11-01",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "displayName": "[variables('vnetName')]"
+            },
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "10.1.0.0/20"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "default",
+                        "properties": {
+                            "addressPrefix": "10.1.0.0/24",
+                            "serviceEndpoints": [
+                                {
+                                    "service": "Microsoft.Web",
+                                    "locations": ["*"]
+                                }
+                            ],
+                            "delegations": [],
+                            "privateEndpointNetworkPolicies": "Enabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        }
+                    },
+                    {
+                        "name": "function-subnet",
+                        "properties": {
+                            "addressPrefix": "10.1.1.0/24",
+                            "serviceEndpoints": [
+                                {
+                                    "service": "Microsoft.Sql",
+                                    "locations": [
+                                        "[resourceGroup().location]"
+                                    ]
+                                }
+                            ],
+                            "delegations": [
+                                {
+                                    "name": "delegation",
+                                    "properties": {
+                                        "serviceName": "Microsoft.Web/serverfarms"
+                                    }
+                                }
+                            ],
+                            "privateEndpointNetworkPolicies": "Enabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "[parameters('sqlServerName')]",
+            "type": "Microsoft.Sql/servers",
+            "apiVersion": "2019-06-01-preview",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "displayName": "[parameters('sqlServerName')]"
+            },
+            "properties": {
+                "administratorLogin": "[parameters('sqlAdmin')]",
+                "administratorLoginPassword": "[parameters('sqlAdminPassword')]",
+                "version": "12.0",
+                "publicNetworkAccess": "Enabled"
+            },
+            "resources": [
+                {
+                    "type": "Microsoft.Sql/servers/virtualNetworkRules",
+                    "apiVersion": "2015-05-01-preview",
+                    "name": "[concat(parameters('sqlServerName'), '/FunctionApp')]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))]",
+                        "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+                    ],
+                    "properties": {
+                        "virtualNetworkSubnetId": "[concat(resourceId('Microsoft.Network/virtualNetworks',variables('vnetName')), '/subnets/function-subnet')]",
+                        "ignoreMissingVnetServiceEndpoint": false
+                    }
+                }
+            ]
+        },
+        {
+            "name": "[concat(parameters('sqlServerName'), '/tododb')]",
+            "type": "Microsoft.Sql/servers/databases",
+            "apiVersion": "2019-06-01-preview",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "displayName": "sqlDatabase1"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))]"
+            ],
+            "sku": {
+                "name": "GP_S_Gen5",
+                "tier": "GeneralPurpose",
+                "family": "Gen5",
+                "capacity": 2
+            },
+            "kind": "v12.0,user,vcore,serverless",
+            "properties": {
+                "collation": "SQL_Latin1_General_CP1_CI_AS",
+                "maxSizeBytes": 34359738368,
+                "catalogCollation": "SQL_Latin1_General_CP1_CI_AS",
+                "zoneRedundant": false,
+                "readScale": "Disabled",
+                "readReplicaCount": 0,
+                "autoPauseDelay": 60,
+                "storageAccountType": "GRS",
+                "minCapacity": 1
+            }
+        },
+        {
+            "name": "[variables('funcAppStorage')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2019-06-01",
+            "tags": {
+                "displayName": "[variables('funcAppStorage')]"
+            },
+            "location": "[resourceGroup().location]",
+            "kind": "StorageV2",
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            }
+        },
+        {
+            "type": "Microsoft.Insights/components",
+            "apiVersion": "2015-05-01",
+            "name": "[variables('appInsightName')]",
+            "location": "[resourceGroup().location]",
+            "kind": "web",
+            "tags": {
+                "[concat('hidden-link:', resourceGroup().id, '/providers/Microsoft.Web/sites/', parameters('functionAppName'))]": "Resource"
+            },
+            "properties": {
+                "Application_Type": "web"
+            }
+        },        
+        {
+            "name": "[variables('appServicePlanName')]",
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2018-02-01",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "P1",
+                "tier": "Premium",
+                "capacity": 1
+            },
+            "kind": "linux",
+            "tags": {
+                "displayName": "[variables('appServicePlanName')]"
+            },
+            "properties": {
+                "maximumElasticWorkerCount": 1
+            }
+        },
+        {
+            "name": "[parameters('functionAppName')]",
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2018-11-01",
+            "location": "[resourceGroup().location]",
+            "kind": "functionapp,linux",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('funcAppStorage'))]",
+                "[resourceId('Microsoft.Insights/components', variables('appInsightName'))]"
+            ],
+            "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+                "siteConfig": {
+                    "appSettings": [
+                        {
+                            "name": "AzureWebJobsStorage",
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('funcAppStorage'), ';AccountKey=', listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('funcAppStorage')),'2015-05-01-preview').key1)]"
+                        },
+                        {
+                            "name": "FUNCTIONS_EXTENSION_VERSION",
+                            "value": "~3"
+                        },
+                        {
+                            "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+                            "value": "[reference(resourceId('microsoft.insights/components/', variables('appInsightName')), '2015-05-01').InstrumentationKey]"
+                        },
+                        {
+                            "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+                            "value": "[concat('InstrumentationKey=', reference(resourceId('microsoft.insights/components/', variables('appInsightName')), '2015-05-01').InstrumentationKey)]"
+                        },
+                        {
+                            "name": "FUNCTIONS_WORKER_RUNTIME",
+                            "value": "dotnet"
+                        },
+                        {
+                            "name": "WEBSITE_RUN_FROM_PACKAGE",
+                            "value": "1"
+                        }
+                    ],
+                    "connectionStrings": [
+                        {
+                            "name": "SQLConnectionString",
+                            "connectionString": "[concat('Server=tcp:',reference(resourceId('Microsoft.Sql/servers',parameters('sqlServerName'))).fullyQualifiedDomainName, ',1433;Initial Catalog=tododb;Persist Security Info=False;User ID=', parameters('sqlAdmin'), ';Password=', parameters('sqlAdminPassword'),';MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;')]",
+                            "type": "SQLAzure"
+                        }
+                    ],
+                    "ipSecurityRestrictions": [
+                        {
+                            "vnetSubnetResourceId": "[concat(resourceId('Microsoft.Network/virtualNetworks',variables('vnetName')), '/subnets/default')]",
+                            "action": "Allow",
+                            "tag": "Default",
+                            "priority": 100,
+                            "name": "vnet access"
+                        },
+                        {
+                            "ipAddress": "Any",
+                            "action": "Deny",
+                            "priority": 2147483647,
+                            "name": "Deny all",
+                            "description": "Deny all access"
+                        }
+                    ]
+                }
+            },
+            "resources": [
+                {
+                    "type": "config",
+                    "apiVersion": "2018-02-01",
+                    "name": "virtualNetwork",
+                    "location": "[resourceGroup().location]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]",
+                        "[resourceId('Microsoft.Network/virtualNetworks',variables('vnetName'))]"
+                    ],
+                    "properties": {
+                        "subnetResourceId": "[concat(resourceId('Microsoft.Network/virtualNetworks',variables('vnetName')), '/subnets/function-subnet')]",
+                        "swiftSupported": true
+                    }
+                },
+                {
+                    "type": "sourcecontrols",
+                    "apiVersion": "2015-08-01",
+                    "name": "todofuncapp",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
+                    ],
+                    "properties": {
+                        "repoUrl": "https://github.com/chunliu/azfunc-todo.git",
+                        "branch": "master",
+                        "isManualIntegration": true,
+                        "isMercurial": false
+                    }
+                }
+            ]
+        }
+    ],
+    "outputs": {}
+}
