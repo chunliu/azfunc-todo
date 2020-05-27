@@ -3,16 +3,16 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "sqlServerName": {
-            "value": "" 
+            "value": "clsqldbinst2" 
         },
         "sqlAdmin": {
-            "value": "" 
+            "value": "dbadmin" 
         },
         "sqlAdminPassword": {
-            "value": "" 
+            "value": "1qaz@WSX" 
         },
         "functionAppName": {
-            "value": "" 
+            "value": "funcappinst3" 
         }
     }
 }

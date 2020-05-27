@@ -233,8 +233,8 @@
                             "value": "dotnet"
                         },
                         {
-                            "name": "WEBSITE_RUN_FROM_PACKAGE",
-                            "value": "1"
+                            "name": "PROJECT",
+                            "value": "/"
                         }
                     ],
                     "connectionStrings": [
@@ -279,8 +279,8 @@
                 },
                 {
                     "type": "sourcecontrols",
-                    "apiVersion": "2015-08-01",
-                    "name": "todofuncapp",
+                    "apiVersion": "2018-11-01",
+                    "name": "web",
                     "dependsOn": [
                         "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
                     ],
@@ -288,7 +288,7 @@
                         "repoUrl": "https://github.com/chunliu/azfunc-todo.git",
                         "branch": "master",
                         "isManualIntegration": true,
-                        "isMercurial": false
+                        "publishRunbook": true
                     }
                 }
             ]
