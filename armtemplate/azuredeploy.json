@@ -348,7 +348,8 @@
                     "name": "[concat(variables('apimName'), '/', parameters('functionAppName'))]",
                     "dependsOn": [
                         "[resourceId('Microsoft.ApiManagement/service', variables('apimName'))]",
-                        "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
+                        "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]",
+                        "[resourceId('Microsoft.ApiManagement/service/namedValues', variables('apimName'), variables('funcAppKeyName'))]"
                     ],
                     "properties": {
                         "protocol": "http",
