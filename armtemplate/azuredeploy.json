@@ -25,6 +25,18 @@
             "metadata": {
                 "description": "The name of the function app"
             }
+        },
+        "apimPublisherEmail": {
+            "type": "string",
+            "metadata": {
+                "description": "The email address of APIM publisher"
+            }
+        },
+        "apimPublisherName": {
+            "type": "string",
+            "metadata": {
+                "description": "The name of APIM publisher"
+            }
         }
     },
     "functions": [],
@@ -32,7 +44,9 @@
         "vnetName": "[concat(resourceGroup().name, '-vnet')]",
         "appServicePlanName": "[concat(parameters('functionAppName'), '-svcplan')]",
         "funcAppStorage": "[concat(parameters('functionAppName'), 'storage')]",
-        "appInsightName": "[concat(resourceGroup().name, '-appinsights')]"
+        "appInsightName": "[concat(resourceGroup().name, '-appinsights')]",
+        "apimName": "[concat('apiminst', take(uniqueString(resourceGroup().id), 4))]",
+        "funcAppKeyName": "[concat(parameters('functionAppName'), '-key')]"
     },
     "resources": [
         {
@@ -290,6 +304,186 @@
                         "isManualIntegration": true,
                         "publishRunbook": true
                     }
+                }
+            ]
+        },
+        {
+            "type": "Microsoft.ApiManagement/service",
+            "apiVersion": "2019-12-01",
+            "name": "[variables('apimName')]",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Developer",
+                "capacity": 1
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+            ],
+            "properties": {
+                "publisherEmail": "[parameters('apimPublisherEmail')]",
+                "publisherName": "[parameters('apimPublisherName')]",
+                "virtualNetworkType": "External",
+                "virtualNetworkConfiguration": {
+                    "subnetResourceId": "[concat(resourceId('Microsoft.Network/virtualNetworks', variables('vnetName')), '/subnets/default')]"
+                }
+            },
+            "resources": [
+                {
+                    "type": "Microsoft.ApiManagement/service/namedValues",
+                    "apiVersion": "2019-12-01",
+                    "name": "[concat(variables('apimName'), '/', variables('funcAppKeyName'))]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.ApiManagement/service', variables('apimName'))]",
+                        "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
+                    ],
+                    "properties": {
+                        "displayName": "[variables('funcAppKeyName')]",
+                        "value": "[listKeys(concat(resourceId('Microsoft.Web/sites', parameters('functionAppName')), '/host/default'), '2019-08-01').functionKeys.default]",
+                        "secret": true
+                    }
+                },
+                {
+                    "type": "Microsoft.ApiManagement/service/backends",
+                    "apiVersion": "2019-12-01",
+                    "name": "[concat(variables('apimName'), '/', parameters('functionAppName'))]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.ApiManagement/service', variables('apimName'))]",
+                        "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
+                    ],
+                    "properties": {
+                        "protocol": "http",
+                        "url": "[concat('https://', parameters('functionAppName'), '.azurewebsites.net/api')]",
+                        "resourceId": "[concat('https://management.azure.com', resourceId('Microsoft.Web/sites', parameters('functionAppName')))]",
+                        "credentials": {
+                            "header": {
+                                "x-functions-key": [
+                                    "[concat('{{', variables('funcAppKeyName'), '}}')]"
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "type": "Microsoft.ApiManagement/service/apis",
+                    "apiVersion": "2019-12-01",
+                    "name": "[concat(variables('apimName'), '/todo-function-app')]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.ApiManagement/service', variables('apimName'))]"
+                    ],
+                    "properties": {
+                        "displayName": "Todo Function App",
+                        "path": "funcapp",
+                        "protocols": [
+                            "https"
+                        ]
+                    },
+                    "resources": [
+                        {
+                            "type": "Microsoft.ApiManagement/service/apis/policies",
+                            "apiVersion": "2019-12-01",
+                            "name": "[concat(variables('apimName'), '/todo-function-app/policy')]",
+                            "dependsOn":[
+                                "[resourceId('Microsoft.ApiManagement/service/apis', variables('apimName'), 'todo-function-app')]",
+                                "[resourceId('Microsoft.ApiManagement/service', variables('apimName'))]",
+                                "[resourceId('Microsoft.ApiManagement/service/backends', variables('apimName'), parameters('functionAppName'))]"
+                            ],
+                            "properties": {
+                                "value": "[concat('<policies>\r\n<inbound>\r\n<base />\r\n<set-backend-service id=\"funcapp-policy\" backend-id=\"', parameters('functionAppName'), '\" />\r\n</inbound>\r\n<backend>\r\n<base />\r\n</backend>\r\n<outbound>\r\n<base />\r\n</outbound>\r\n<on-error>\r\n<base />\r\n</on-error>\r\n</policies>')]",
+                                "format": "xml"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.ApiManagement/service/apis/operations",
+                            "apiVersion": "2019-12-01",
+                            "name": "[concat(variables('apimName'), '/todo-function-app/get-todofunc-gettodos')]",
+                            "dependsOn": [
+                                "[resourceId('Microsoft.ApiManagement/service', variables('apimName'))]",
+                                "[resourceId('Microsoft.ApiManagement/service/apis', variables('apimName'), 'todo-function-app')]"
+                            ],
+                            "properties": {
+                                "displayName": "TodoFunc_GetTodos",
+                                "method": "GET",
+                                "urlTemplate": "/todo"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.ApiManagement/service/apis/operations",
+                            "apiVersion": "2019-12-01",
+                            "name": "[concat(variables('apimName'), '/todo-function-app/get-todofunc-gettodobyid')]",
+                            "dependsOn": [
+                                "[resourceId('Microsoft.ApiManagement/service', variables('apimName'))]",
+                                "[resourceId('Microsoft.ApiManagement/service/apis', variables('apimName'), 'todo-function-app')]"
+                            ],
+                            "properties": {
+                                "displayName": "TodoFunc_GetTodoById",
+                                "method": "GET",
+                                "urlTemplate": "/todo/{id}",
+                                "templateParameters": [
+                                    {
+                                        "name": "id",
+                                        "required": true,
+                                        "type": "integer"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "type": "Microsoft.ApiManagement/service/apis/operations",
+                            "apiVersion": "2019-12-01",
+                            "name": "[concat(variables('apimName'), '/todo-function-app/get-todofunc-create')]",
+                            "dependsOn": [
+                                "[resourceId('Microsoft.ApiManagement/service', variables('apimName'))]",
+                                "[resourceId('Microsoft.ApiManagement/service/apis', variables('apimName'), 'todo-function-app')]"
+                            ],
+                            "properties": {
+                                "displayName": "TodoFunc_Create",
+                                "method": "POST",
+                                "urlTemplate": "/todo"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.ApiManagement/service/apis/operations",
+                            "apiVersion": "2019-12-01",
+                            "name": "[concat(variables('apimName'), '/todo-function-app/get-todofunc-update')]",
+                            "dependsOn": [
+                                "[resourceId('Microsoft.ApiManagement/service', variables('apimName'))]",
+                                "[resourceId('Microsoft.ApiManagement/service/apis', variables('apimName'), 'todo-function-app')]"
+                            ],
+                            "properties": {
+                                "displayName": "TodoFunc_Update",
+                                "method": "PUT",
+                                "urlTemplate": "/todo/{id}",
+                                "templateParameters": [
+                                    {
+                                        "name": "id",
+                                        "required": true,
+                                        "type": "integer"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "type": "Microsoft.ApiManagement/service/apis/operations",
+                            "apiVersion": "2019-12-01",
+                            "name": "[concat(variables('apimName'), '/todo-function-app/get-todofunc-delete')]",
+                            "dependsOn": [
+                                "[resourceId('Microsoft.ApiManagement/service', variables('apimName'))]",
+                                "[resourceId('Microsoft.ApiManagement/service/apis', variables('apimName'), 'todo-function-app')]"
+                            ],
+                            "properties": {
+                                "displayName": "TodoFunc_Delete",
+                                "method": "DELETE",
+                                "urlTemplate": "/todo/{id}",
+                                "templateParameters": [
+                                    {
+                                        "name": "id",
+                                        "required": true,
+                                        "type": "integer"
+                                    }
+                                ]
+                            }
+                        }                                                                                            
+                    ]
                 }
             ]
         }

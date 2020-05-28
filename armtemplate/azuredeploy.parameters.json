@@ -3,16 +3,22 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "sqlServerName": {
-            "value": "clsqldbinst2" 
+            "value": "sqlservername" 
         },
         "sqlAdmin": {
             "value": "dbadmin" 
         },
         "sqlAdminPassword": {
-            "value": "1qaz@WSX" 
+            "value": "password" 
         },
         "functionAppName": {
-            "value": "funcappinst3" 
+            "value": "funcationappname" 
+        },
+        "apimPublisherEmail": {
+            "value": "publisher@example.com"
+        },
+        "apimPublisherName": {
+            "value": "publisher" 
         }
     }
 }
