@@ -248,7 +248,7 @@
                         },
                         {
                             "name": "PROJECT",
-                            "value": "/"
+                            "value": "src"
                         }
                     ],
                     "connectionStrings": [

@@ -23,7 +23,7 @@ jobs:
         dotnet-version: ${{ env.NETCORE_VERSION }}
 
     - name: Build
-      run: dotnet build --configuration Release --output ./output
+      run: dotnet build ./src --configuration Release --output ./output
     
     - name: Azure Login
       uses: Azure/login@v1.1

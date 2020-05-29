@@ -24,7 +24,7 @@ jobs:
         dotnet-version: ${{ env.NETCORE_VERSION }}
 
     - name: Build
-      run: dotnet build --configuration Release --output ./output
+      run: dotnet build ./src --configuration Release --output ./output
     
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v2
