@@ -301,8 +301,7 @@
                     "properties": {
                         "repoUrl": "https://github.com/chunliu/azfunc-todo.git",
                         "branch": "master",
-                        "isManualIntegration": true,
-                        "publishRunbook": true
+                        "isManualIntegration": true
                     }
                 }
             ]
